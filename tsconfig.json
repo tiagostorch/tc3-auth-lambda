@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2023"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    // Os testes rodam sob type stripping do Node, que exige a extensão no import.
+    "allowImportingTsExtensions": true,
+    "types": ["node", "aws-lambda"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

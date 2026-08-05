@@ -1,0 +1,25 @@
+{
+  "name": "tc3-auth-lambda",
+  "version": "1.0.0",
+  "description": "Function serverless de autenticacao por CPF - Tech Challenge Fase 3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.js",
+    "package": "npm run build && cd dist && zip -r ../lambda.zip index.js",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.147",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2"
+  }
+}

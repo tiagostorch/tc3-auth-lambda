@@ -1,0 +1,10 @@
+aws_region   = "us-east-1"
+environment  = "homolog"
+state_bucket = "tc3-tfstate-oficina-SEUSUFIXO"
+
+jwt_expires_in = "1h"
+
+# Preencher com o listener do ALB criado pelo Ingress da aplicação para que o
+# Gateway roteie também as rotas protegidas:
+# alb_listener_arn = "arn:aws:elasticloadbalancing:us-east-1:...:listener/app/..."
+alb_listener_arn = ""
