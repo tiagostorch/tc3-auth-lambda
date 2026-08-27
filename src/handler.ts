@@ -38,6 +38,11 @@ function obterPool(): Pool {
       max: 2,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5_000,
+
+      // O RDS recusa conexão sem TLS (rds.force_ssl), e o driver só negocia
+      // criptografia se pedirmos. Sem verificar o certificado: a CA do RDS não
+      // está no bundle padrão do Node, e o tráfego não sai da VPC.
+      ssl: { rejectUnauthorized: false },
     });
   }
 
