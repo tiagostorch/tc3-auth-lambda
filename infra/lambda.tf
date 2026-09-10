@@ -14,6 +14,19 @@ resource "aws_ssm_parameter" "jwt_secret" {
   value       = random_password.jwt_secret.result
 }
 
+# Token usado exclusivamente entre a API no EKS e a rota /mail.
+resource "random_password" "mail_api_token" {
+  length  = 48
+  special = false
+}
+
+resource "aws_ssm_parameter" "mail_api_token" {
+  name        = "${local.ssm_prefix}/MAIL_API_TOKEN"
+  description = "Token interno para chamadas da API para a Lambda de e-mail"
+  type        = "SecureString"
+  value       = random_password.mail_api_token.result
+}
+
 # ─── Rede ───────────────────────────────────────────────────────────────────
 
 resource "aws_security_group" "lambda" {
@@ -88,8 +101,8 @@ resource "aws_lambda_function" "auth" {
   function_name = local.identificador
   role          = aws_iam_role.lambda.arn
 
-  filename         = var.lambda_package_path
-  source_code_hash = filebase64sha256(var.lambda_package_path)
+  filename         = var.auth_lambda_package_path
+  source_code_hash = filebase64sha256(var.auth_lambda_package_path)
 
   runtime = "nodejs22.x"
   handler = "index.handler"
@@ -113,4 +126,37 @@ resource "aws_lambda_function" "auth" {
   }
 
   depends_on = [aws_cloudwatch_log_group.lambda]
+}
+
+resource "aws_cloudwatch_log_group" "mail" {
+  name              = "/aws/lambda/${local.mail_identificador}"
+  retention_in_days = 7
+}
+
+resource "aws_lambda_function" "mail" {
+  function_name = local.mail_identificador
+  role          = aws_iam_role.lambda.arn
+
+  filename         = var.mail_lambda_package_path
+  source_code_hash = filebase64sha256(var.mail_lambda_package_path)
+
+  runtime = "nodejs22.x"
+  handler = "index.handler"
+
+  memory_size = var.lambda_memory_mb
+  timeout     = 30
+
+  vpc_config {
+    subnet_ids         = local.private_subnet_ids
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
+  environment {
+    variables = {
+      MAIL_SSM_PREFIX = local.ssm_prefix
+      NODE_OPTIONS    = "--enable-source-maps"
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.mail]
 }

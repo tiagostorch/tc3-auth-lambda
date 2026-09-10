@@ -5,19 +5,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.js",
-    "package": "npm run build && cd dist && zip -r ../lambda.zip index.js",
+    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/auth/index.js && esbuild src/mail_handler.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/mail/index.js",
+    "package": "npm run build && powershell -NoProfile -Command \"Compress-Archive -Path dist/auth/index.js -DestinationPath auth-lambda.zip -Force; Compress-Archive -Path dist/mail/index.js -DestinationPath mail-lambda.zip -Force\"",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-ssm": "^3.1130.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^10.0.3",
     "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.147",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.10",
     "esbuild": "^0.24.2",
     "typescript": "^5.7.2"

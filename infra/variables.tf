@@ -18,10 +18,16 @@ variable "state_bucket" {
   type        = string
 }
 
-variable "lambda_package_path" {
-  description = "Artefato gerado por `npm run package`."
+variable "auth_lambda_package_path" {
+  description = "Artefato da Lambda de autenticaÃ§Ã£o gerado por `npm run package`."
   type        = string
-  default     = "../lambda.zip"
+  default     = "../auth-lambda.zip"
+}
+
+variable "mail_lambda_package_path" {
+  description = "Artefato da Lambda de e-mail gerado por `npm run package`."
+  type        = string
+  default     = "../mail-lambda.zip"
 }
 
 variable "jwt_expires_in" {
