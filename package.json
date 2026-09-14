@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/auth/index.js && esbuild src/mail_handler.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/mail/index.js",
-    "package": "npm run build && powershell -NoProfile -Command \"Compress-Archive -Path dist/auth/index.js -DestinationPath auth-lambda.zip -Force; Compress-Archive -Path dist/mail/index.js -DestinationPath mail-lambda.zip -Force\"",
+        "package": "npm run build && cd dist && zip -j ../auth-lambda.zip auth/index.js && zip -j ../mail-lambda.zip mail/index.js",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "lint": "tsc --noEmit"
   },
