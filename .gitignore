@@ -9,3 +9,7 @@ crash.log
 node_modules/
 dist/
 *.zip
+
+# Variáveis de ambiente / credenciais — NUNCA commitar
+.env
+.env.*

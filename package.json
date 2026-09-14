@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.js",
+    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=cjs --external:newrelic --outfile=dist/index.js",
     "package": "npm run build && cd dist && zip -r ../lambda.zip index.js",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "lint": "tsc --noEmit"

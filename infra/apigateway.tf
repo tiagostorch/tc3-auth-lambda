@@ -3,10 +3,27 @@ resource "aws_apigatewayv2_api" "http" {
   description   = "Entrada unica da oficina: autenticacao por CPF e rotas protegidas"
   protocol_type = "HTTP"
 
+  # Os cabeçalhos de trace precisam estar liberados no CORS. Um navegador (com o
+  # agente Browser do New Relic, ou qualquer instrumentação W3C) só envia
+  # `traceparent`/`tracestate` numa chamada cross-origin se o preflight os
+  # autorizar — senão o cabeçalho é descartado antes de sair, e a Lambda e a API
+  # começam cada uma um trace novo, sem correlação. `newrelic` é o cabeçalho
+  # proprietário que o agente Browser também envia.
+  #
+  # `expose_headers` deixa o front ler o correlationId e o `traceresponse`
+  # (W3C Level 2) — o id que liga a tela do usuário ao trace no New Relic.
   cors_configuration {
     allow_origins = ["*"]
     allow_methods = ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"]
-    allow_headers = ["content-type", "authorization"]
+    allow_headers = [
+      "content-type",
+      "authorization",
+      "traceparent",
+      "tracestate",
+      "newrelic",
+      "x-correlation-id",
+    ]
+    expose_headers = ["x-correlation-id", "traceresponse"]
   }
 }
 
