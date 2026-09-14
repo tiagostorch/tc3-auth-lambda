@@ -8,3 +8,24 @@ jwt_expires_in = "1h"
 # Gateway roteie também as rotas protegidas:
 # alb_listener_arn = "arn:aws:elasticloadbalancing:us-east-1:...:listener/app/..."
 alb_listener_arn = ""
+
+# ─── Observabilidade ────────────────────────────────────────────────────────
+# A ARN da layer muda por região e a cada release do agente. A lista publicada
+# está em https://layers.newrelic-external.com — procurar NewRelicNodeJS22X.
+newrelic_enabled   = true
+newrelic_layer_arn = "arn:aws:lambda:us-east-1:451483290750:layer:NewRelicNodeJS22X:SUBSTITUIR"
+newrelic_region    = "US"
+
+# Account ID: por variável de ambiente (TF_VAR_newrelic_account_id — secret
+# NEW_RELIC_ACCOUNT_ID no CI, .env na raiz localmente), não neste arquivo.
+# A license key não é lida por este repositório: a extension a busca no SSM.
+
+# Tags padrão em toda telemetria — iguais às de tc3-infra-k8s e tc3-infra-db.
+newrelic_tags = {
+  environment = "production"
+  project     = "tech-challenge-fiap"
+}
+
+# Ligar só para depurar a própria extension: com ela funcionando, o log group
+# seria uma segunda cópia integral do log, cobrada por GB.
+cloudwatch_logs_enabled = false

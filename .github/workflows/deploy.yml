@@ -12,6 +12,22 @@ env:
   NODE_VERSION: "22"
   TF_VAR_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
 
+  # ─── New Relic ──────────────────────────────────────────────────────────────
+  # A license key não passa por aqui: a função a lê do SSM, onde tc3-infra-k8s a
+  # publicou. Do CI vêm só o account ID — que o agente usa para marcar o trace e
+  # ligá-lo ao da API no cluster — e a ARN da layer.
+  TF_VAR_newrelic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+
+  # Configuração, não segredo, e por isso *variable* e não secret: a ARN é
+  # pública e mascará-la no log esconde justamente o valor que se quer conferir
+  # quando a instrumentação não sobe.
+  #
+  # Muda por região e a cada release do agente; a lista publicada está em
+  # https://layers.newrelic-external.com (procurar NewRelicNodeJS22X). Vazia com
+  # `newrelic_enabled = true`, o plan falha com a explicação — de propósito, já
+  # que a alternativa é uma função sem instrumentação que ninguém percebe.
+  TF_VAR_newrelic_layer_arn: ${{ vars.NEWRELIC_LAYER_ARN }}
+
 permissions:
   contents: read
   id-token: write
