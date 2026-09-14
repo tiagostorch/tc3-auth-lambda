@@ -98,7 +98,57 @@ A documentação Swagger das rotas protegidas fica no repositório da aplicaçã
 - **Push em `develop`** → deploy em homologação
 - **Push em `main`** → deploy em produção
 
-Secrets necessários: `AWS_ROLE_ARN` e `TF_STATE_BUCKET` (vindos do bootstrap em `tc3-infra-k8s`).
+Secrets necessários: `AWS_ROLE_ARN` e `TF_STATE_BUCKET` (vindos do bootstrap em `tc3-infra-k8s`) e `NEW_RELIC_ACCOUNT_ID`.
+
+A ARN da layer entra como *variable* do repositório, em `NEWRELIC_LAYER_ARN`: é
+valor público, e mascará-lo no log esconde justamente o que se quer conferir
+quando a instrumentação não sobe. A license key não passa pelo CI nem pelo
+Terraform deste repositório: a função recebe só o **nome** do parâmetro no SSM
+(`NEW_RELIC_LICENSE_KEY_SSM_PARAMETER_NAME`), e a extension lê a chave em
+runtime. Ela não aparece na configuração da função nem no state.
+
+Localmente, os valores ficam no `.env` da raiz (ignorado pelo git — `.env` e
+`.env.*` no `.gitignore`): `set -a; source .env; set +a` antes do `terraform plan`.
+
+## Observabilidade
+
+A função é instrumentada pela layer do New Relic, que traz o agente Node e a
+**extension**. É a extension que torna o desenho possível: ela recolhe métrica,
+trace e log dentro do próprio processo e faz POST direto na API do New Relic ao
+fim de cada invocação.
+
+```
+handler ──▶ agente ──▶ extension ──HTTPS──▶ New Relic
+```
+
+Sem ela, o caminho oficial seria log group do CloudWatch + subscription filter +
+uma segunda Lambda de ingestão — cobrado por GB duas vezes, uma na AWS e outra
+no New Relic.
+
+Para o log group não ser criado às escondidas, a política gerenciada
+`AWSLambdaVPCAccessExecutionRole` foi trocada por uma própria, com as permissões
+de ENI e **sem** `logs:*`. Para depurar a própria extension,
+`cloudwatch_logs_enabled = true` devolve o comportamento padrão.
+
+A ARN da layer muda por região e por versão do agente e precisa ser informada em
+`newrelic_layer_arn` — a lista está em <https://layers.newrelic-external.com>.
+
+**Correlação W3C Trace Context.** O agente da layer adota o `traceparent` que
+chega pelo API Gateway, e a resposta devolve `traceresponse` com o mesmo
+trace-id. Um cliente que reenvia esse trace-id à API do cluster junta as duas
+pontas no mesmo trace distribuído. O CORS do API Gateway libera `traceparent`,
+`tracestate`, `newrelic` e `x-correlation-id` (sem isso o navegador descarta os
+cabeçalhos) e expõe `traceresponse`. Todo log sai com `trace.id`, `span.id` e as
+tags `environment`/`project`.
+
+```bash
+curl -si -X POST "$(terraform -chdir=infra output -raw auth_url)" \
+  -H "traceparent: 00-$(openssl rand -hex 16)-$(openssl rand -hex 8)-01" \
+  -H 'content-type: application/json' -d '{"cpf":"<cpf>"}' | grep -i traceresponse
+```
+
+O detalhamento, incluindo a tabela completa de variáveis de ambiente, está em
+[`tc3-infra-k8s/OBSERVABILIDADE.md`](../tc3-infra-k8s/OBSERVABILIDADE.md).
 
 ## Decisões registradas
 
