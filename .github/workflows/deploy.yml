@@ -12,6 +12,12 @@ env:
   NODE_VERSION: "22"
   TF_VAR_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
 
+  # Listener do ALB criado em runtime pelo Ingress do app no EKS (não é output de
+  # Terraform, por isso entra aqui como valor manual). Preenchido, liga o VPC Link
+  # e a rota `ANY /{proxy+}`, fazendo o API Gateway rotear também as rotas
+  # protegidas da aplicação. Se o Ingress for recriado, este ARN muda.
+  TF_VAR_alb_listener_arn: "arn:aws:elasticloadbalancing:us-east-1:008363475762:listener/app/k8s-oficina-oficinaa-5b75d4a62f/2dc7b23786aa56f3/93200dd5c8cdce83"
+
   # ─── New Relic ──────────────────────────────────────────────────────────────
   # A license key não passa por aqui: a função a lê do SSM, onde tc3-infra-k8s a
   # publicou. Do CI vêm só o account ID — que o agente usa para marcar o trace e
