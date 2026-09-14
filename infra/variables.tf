@@ -19,7 +19,7 @@ variable "state_bucket" {
 }
 
 variable "auth_lambda_package_path" {
-  description = "Artefato da Lambda de autenticaÃ§Ã£o gerado por `npm run package`."
+  description = "Artefato da Lambda de autenticação gerado por `npm run package`."
   type        = string
   default     = "../auth-lambda.zip"
 }
