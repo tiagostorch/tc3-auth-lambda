@@ -117,7 +117,11 @@ data "aws_iam_policy_document" "lambda_logs" {
       "logs:PutLogEvents",
     ]
 
-    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.atual.account_id}:log-group:/aws/lambda/${local.identificador}:*"]
+    # As duas funções dividem a role: o modo de depuração vale para ambas.
+    resources = [
+      for funcao in [local.identificador, local.mail_identificador] :
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.atual.account_id}:log-group:/aws/lambda/${funcao}:*"
+    ]
   }
 }
 
@@ -341,7 +345,14 @@ resource "aws_lambda_function" "auth" {
   }
 }
 
+# ─── Função de e-mail ───────────────────────────────────────────────────────
+# Mesmo desenho da autenticação: divide a role, e por isso também não tem
+# permissão de log por padrão. O log sai pela extension do New Relic; o log
+# group só existe no modo de depuração.
+
 resource "aws_cloudwatch_log_group" "mail" {
+  count = var.cloudwatch_logs_enabled ? 1 : 0
+
   name              = "/aws/lambda/${local.mail_identificador}"
   retention_in_days = 7
 }
@@ -354,7 +365,13 @@ resource "aws_lambda_function" "mail" {
   source_code_hash = filebase64sha256(var.mail_lambda_package_path)
 
   runtime = "nodejs22.x"
-  handler = "index.handler"
+  handler = var.newrelic_enabled ? "newrelic-lambda-wrapper.handler" : "index.handler"
+
+  # A precondition de layer × arquitetura está na função de autenticação; as
+  # duas usam as mesmas variáveis.
+  architectures = [var.lambda_architecture]
+
+  layers = var.newrelic_enabled ? [var.newrelic_layer_arn] : []
 
   memory_size = var.lambda_memory_mb
   timeout     = 30
@@ -365,10 +382,16 @@ resource "aws_lambda_function" "mail" {
   }
 
   environment {
-    variables = {
-      MAIL_SSM_PREFIX = local.ssm_prefix
-      NODE_OPTIONS    = "--enable-source-maps"
-    }
+    variables = merge(
+      {
+        MAIL_SSM_PREFIX  = local.ssm_prefix
+        NODE_OPTIONS     = "--enable-source-maps"
+        NEW_RELIC_LABELS = local.newrelic_labels
+      },
+      local.newrelic_env,
+      # `newrelic_env` nomeia a entidade como a função de autenticação.
+      var.newrelic_enabled ? { NEW_RELIC_APP_NAME = local.mail_identificador } : {},
+    )
   }
 
   depends_on = [aws_cloudwatch_log_group.mail]

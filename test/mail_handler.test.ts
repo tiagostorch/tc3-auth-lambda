@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { criarMailHandler, type DependenciasMailHandler } from '../src/mail_handler.ts';
+import { criarMailHandler, memoizarSemFalha, type DependenciasMailHandler } from '../src/mail_handler.ts';
 
 const configuracao = { host: 'smtp.example.com', port: 587, user: 'user', pass: 'pass', apiToken: 'segredo' };
 function handler(dependencias: Partial<DependenciasMailHandler> = {}) {
@@ -23,4 +23,18 @@ test('aceita body em base64', async () => {
 test('retorna 500 quando o SMTP falha', async () => {
   const resposta = await handler({ criarTransport: () => ({ sendMail: async () => { throw new Error('SMTP down'); } }) })(evento({ to: 'a@b.com', subject: 'Teste', text: 'Olá' }), contexto);
   assert.equal(resposta.statusCode, 500);
+});
+test('configuração: falha não fica em cache', async () => {
+  let chamadas = 0;
+  const obter = memoizarSemFalha(async () => { chamadas += 1; if (chamadas === 1) throw new Error('Parametros SSM ausentes'); return configuracao; });
+  await assert.rejects(obter(), /ausentes/);
+  assert.deepEqual(await obter(), configuracao);
+  assert.equal(chamadas, 2);
+});
+test('configuração: sucesso fica em cache', async () => {
+  let chamadas = 0;
+  const obter = memoizarSemFalha(async () => { chamadas += 1; return configuracao; });
+  await obter();
+  await obter();
+  assert.equal(chamadas, 1);
 });
