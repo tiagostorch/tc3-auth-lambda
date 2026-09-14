@@ -47,8 +47,8 @@ A API no EKS valida o token com o mesmo segredo, sem chamar esta função.
 
 ```bash
 npm ci
-npm test          # validação de CPF
-npm run package   # gera lambda.zip
+npm test          # validação de CPF e handler de e-mail
+npm run package   # gera auth-lambda.zip e mail-lambda.zip
 ```
 
 ## Deploy

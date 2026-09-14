@@ -42,8 +42,9 @@ data "aws_ssm_parameter" "newrelic_license_key" {
 }
 
 locals {
-  identificador = "${var.project_name}-${var.environment}-auth"
-  ssm_prefix    = data.terraform_remote_state.db.outputs.ssm_prefix
+  identificador      = "${var.project_name}-${var.environment}-auth"
+  mail_identificador = "${var.project_name}-${var.environment}-mail"
+  ssm_prefix         = data.terraform_remote_state.db.outputs.ssm_prefix
 
   # Tags padrão no formato de NEW_RELIC_LABELS, idêntico ao da API no cluster.
   newrelic_labels = join(";", [for chave, valor in var.newrelic_tags : "${chave}:${valor}"])

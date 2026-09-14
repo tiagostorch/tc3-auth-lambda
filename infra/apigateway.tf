@@ -42,10 +42,31 @@ resource "aws_apigatewayv2_route" "post_auth" {
   target    = "integrations/${aws_apigatewayv2_integration.auth.id}"
 }
 
+resource "aws_apigatewayv2_integration" "mail" {
+  api_id                 = aws_apigatewayv2_api.http.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.mail.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "post_mail" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /mail"
+  target    = "integrations/${aws_apigatewayv2_integration.mail.id}"
+}
+
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.auth.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gateway_mail" {
+  statement_id  = "AllowExecutionFromAPIGatewayMail"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.mail.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
