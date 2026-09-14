@@ -26,9 +26,9 @@ data "aws_ssm_parameter" "database_url" {
 }
 
 locals {
-  identificador = "${var.project_name}-${var.environment}-auth"
+  identificador      = "${var.project_name}-${var.environment}-auth"
   mail_identificador = "${var.project_name}-${var.environment}-mail"
-  ssm_prefix    = data.terraform_remote_state.db.outputs.ssm_prefix
+  ssm_prefix         = data.terraform_remote_state.db.outputs.ssm_prefix
 
   vpc_id             = data.terraform_remote_state.k8s.outputs.vpc_id
   private_subnet_ids = data.terraform_remote_state.k8s.outputs.private_subnet_ids
