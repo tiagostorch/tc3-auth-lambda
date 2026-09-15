@@ -29,7 +29,7 @@ graph TB
         end
     end
 
-    SMTP["<b>SMTP</b><br/>Ethereal (homolog) / SES (prod)"]
+    SMTP["<b>SMTP</b><br/>Ethereal (testes) / SES (real)"]
 
     Cliente -->|"POST /auth &#123;cpf&#125;"| GW
     GW -->|"/auth"| Auth
@@ -158,15 +158,17 @@ Endereços saem nos outputs (`terraform output`):
 | `ssm_mail_api_token_name` | Nome do parâmetro SSM do `MAIL_API_TOKEN` (consumido pela API como `MAIL_LAMBDA_TOKEN`) |
 | `ssm_mail_smtp_parameter_names` | Nomes dos parâmetros de SMTP a preencher com as credenciais reais |
 
-> Após o `apply`, preencha os parâmetros de **SMTP** no SSM (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`) com as credenciais do provedor (em homolog, uma conta [Ethereal](https://ethereal.email)). O `JWT_SECRET` e o `MAIL_API_TOKEN` são gerados pelo Terraform.
+> Após o `apply`, preencha os parâmetros de **SMTP** no SSM (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`) com as credenciais do provedor de e-mail (para testes, uma conta [Ethereal](https://ethereal.email)). O `JWT_SECRET` e o `MAIL_API_TOKEN` são gerados pelo Terraform.
 
 ## CI/CD
 
 `.github/workflows/deploy.yml`
 
 - **Pull request** → lint, testes, empacotamento e `terraform plan`
-- **Push em `develop`** → deploy em homologação
-- **Push em `main`** → deploy em produção
+- **Push em `develop`** → deploy automático (rótulo `homolog` no GitHub)
+- **Push em `main`** → deploy automático (rótulo `production` no GitHub)
+
+> **Ambiente único:** `develop` e `main` aplicam no **mesmo** ambiente na AWS (mesmo state e recursos) — a distinção homologação/produção é apenas o rótulo do deploy no GitHub e foi desconsiderada.
 
 Secrets necessários: `AWS_ROLE_ARN` e `TF_STATE_BUCKET` (do bootstrap em `tc3-infra-k8s`) e `NEW_RELIC_ACCOUNT_ID`. A ARN da layer do New Relic entra como *variable* do repositório (`NEWRELIC_LAYER_ARN`) — é valor público. A **license key** não passa pelo CI nem pelo Terraform: a função recebe só o **nome** do parâmetro no SSM (`NEW_RELIC_LICENSE_KEY_SSM_PARAMETER_NAME`) e a extension lê a chave em runtime.
 
