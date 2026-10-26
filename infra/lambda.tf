@@ -37,19 +37,9 @@ resource "aws_security_group" "lambda" {
 
 resource "aws_vpc_security_group_egress_rule" "lambda_saida" {
   security_group_id = aws_security_group.lambda.id
-  description       = "Saida liberada (Postgres e endpoints AWS)"
+  description       = "Saida liberada (SMTP e endpoints AWS)"
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
-}
-
-# Autoriza a Lambda no security group do RDS, que é gerenciado em tc3-infra-db.
-resource "aws_vpc_security_group_ingress_rule" "db_aceita_lambda" {
-  security_group_id            = local.db_security_group
-  description                  = "Postgres a partir da Lambda de autenticacao"
-  referenced_security_group_id = aws_security_group.lambda.id
-  from_port                    = 5432
-  to_port                      = 5432
-  ip_protocol                  = "tcp"
 }
 
 # ─── Permissões ─────────────────────────────────────────────────────────────
@@ -272,19 +262,19 @@ resource "aws_lambda_function" "auth" {
   memory_size = var.lambda_memory_mb
   timeout     = var.lambda_timeout_seconds
 
-  # Dentro da VPC para alcançar o RDS, que não é público.
-  vpc_config {
-    subnet_ids         = local.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
-  }
+  # Fora da VPC: a função não acessa nenhum banco. O cliente vem do OS Service
+  # pela rota interna, chamada pelo endereço público do API Gateway e protegida
+  # pelo token do SSM (src/cliente_os.ts). Na Fase 4 nenhum componente lê o
+  # banco de outro serviço.
 
   environment {
     variables = merge(
       {
-        DATABASE_URL   = data.aws_ssm_parameter.database_url.value
-        JWT_SECRET     = random_password.jwt_secret.result
-        JWT_EXPIRES_IN = var.jwt_expires_in
-        NODE_OPTIONS   = "--enable-source-maps"
+        OS_API_URL                       = aws_apigatewayv2_api.http.api_endpoint
+        INTERNAL_API_TOKEN_SSM_PARAMETER = "${local.ssm_prefix}/INTERNAL_API_TOKEN"
+        JWT_SECRET                       = random_password.jwt_secret.result
+        JWT_EXPIRES_IN                   = var.jwt_expires_in
+        NODE_OPTIONS                     = "--enable-source-maps"
 
         # Tags padrão do projeto (environment/project). O handler as escreve em
         # todo log e as prende à invocação (AwsLambdaInvocation) — mesmas tags

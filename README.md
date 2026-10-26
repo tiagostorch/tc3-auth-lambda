@@ -6,10 +6,10 @@ Contém **duas** AWS Lambda, atrás do **mesmo API Gateway**:
 
 | Função | Rota | Papel |
 |---|---|---|
-| **Autenticação por CPF** | `POST /auth` | Valida o CPF, confirma que o cliente existe e está **ATIVO** no banco e devolve um **JWT** aceito pela API da oficina. |
+| **Autenticação por CPF** | `POST /auth` | Valida o CPF, confirma no **OS Service** que o cliente existe e está **ATIVO** e devolve um **JWT** aceito pelos serviços da oficina. |
 | **Notificações por e-mail** | `POST /mail` | Recebe uma solicitação autenticada da API e envia o e-mail (orçamento, finalização, entrega) via **SMTP**. Isola o SMTP fora da aplicação — é a peça "serverless de notificações" da fase. |
 
-As rotas protegidas da aplicação também passam por este API Gateway (`ANY /{proxy+}` → ALB via VPC Link).
+As rotas protegidas da aplicação também passam por este API Gateway (`ANY /{proxy+}` → ALB via VPC Link). Na Fase 4, o mesmo ALB atende os três microsserviços: o OS Service nas rotas sem prefixo, o Billing em `/billing` e o Execution em `/execution`.
 
 ## Arquitetura
 
@@ -19,13 +19,12 @@ graph TB
 
     subgraph AWS["AWS · us-east-1"]
         GW["<b>API Gateway</b> (HTTP API v2)<br/>POST /auth · POST /mail<br/>ANY /&#123;proxy+&#125; → ALB (VPC Link)"]
-        SSM["<b>SSM Parameter Store</b><br/>JWT_SECRET · MAIL_API_TOKEN<br/>MAIL_HOST/PORT/USER/PASS (SecureString)"]
+        SSM["<b>SSM Parameter Store</b><br/>JWT_SECRET · MAIL_API_TOKEN · INTERNAL_API_TOKEN<br/>MAIL_HOST/PORT/USER/PASS (SecureString)<br/>API_GATEWAY_URL"]
+        Auth["<b>Lambda — auth</b><br/>valida CPF · busca o cliente no OS<br/>assina JWT (HS256)"]
 
         subgraph VPC["VPC — subnets privadas"]
-            Auth["<b>Lambda — auth</b><br/>valida CPF · consulta cliente<br/>assina JWT (HS256)"]
             Mail["<b>Lambda — e-mail</b><br/>valida token · envia via SMTP"]
-            ALB["<b>ALB</b> → API no EKS<br/>(repo tech-challenge-fiap)"]
-            RDS[("<b>RDS PostgreSQL</b><br/>gerenciado · TLS")]
+            ALB["<b>ALB</b> → serviços no EKS<br/>OS Service (cadastro de clientes)"]
         end
     end
 
@@ -33,8 +32,8 @@ graph TB
 
     Cliente -->|"POST /auth &#123;cpf&#125;"| GW
     GW -->|"/auth"| Auth
-    Auth -->|"SELECT cliente (TLS)"| RDS
-    Auth -->|"lê JWT_SECRET"| SSM
+    Auth -->|"lê INTERNAL_API_TOKEN"| SSM
+    Auth -->|"POST /internal/clientes/busca<br/>+ x-internal-token"| GW
     Auth -->|"JWT { token, cliente }"| Cliente
 
     Cliente -->|"Bearer JWT (rotas protegidas)"| GW
@@ -47,30 +46,31 @@ graph TB
     Mail -->|"envia e-mail"| SMTP
 ```
 
-O ponto-chave do desenho: a **autenticação é desacoplada por segredo compartilhado**. A Lambda de auth *emite* o JWT; a API no EKS apenas o *valida* com o **mesmo segredo** (lido do SSM) — as duas nunca se chamam. A notificação, ao contrário, é uma chamada síncrona: a API faz `POST /mail` com um token interno, e a Lambda de e-mail encapsula o SMTP.
+O ponto-chave do desenho: a **autenticação é desacoplada por segredo compartilhado**. A Lambda de auth *emite* o JWT; os serviços no EKS apenas o *validam* com o **mesmo segredo** (lido do SSM), sem chamar a função. Para emitir, a Lambda pergunta ao OS Service, dono do cadastro de clientes, pela rota interna `POST /internal/clientes/busca`: na Fase 4 nenhum componente lê o banco de outro serviço. A notificação é uma chamada síncrona no sentido contrário: o serviço faz `POST /mail` com um token interno, e a Lambda de e-mail encapsula o SMTP.
 
 ## O que este repositório cria (Terraform)
 
 | Recurso | Detalhe |
 |---|---|
-| `aws_lambda_function.auth` | Node.js 22, dentro da VPC para alcançar o RDS |
+| `aws_lambda_function.auth` | Node.js 22, fora da VPC: não acessa banco, consulta o OS Service pela rota interna |
 | `aws_lambda_function.mail` | Node.js 22, envia e-mail via SMTP (nodemailer) |
 | API Gateway HTTP API v2 | Rotas `POST /auth`, `POST /mail` e `ANY /{proxy+}` (VPC Link → ALB) |
 | `aws_ssm_parameter.jwt_secret` | Segredo do JWT (HS256), gerado pelo Terraform — o **mesmo** que a API valida |
 | `aws_ssm_parameter.mail_api_token` | Token interno (`random_password`) entre a API e a rota `/mail` |
+| `aws_ssm_parameter.api_gateway_url` | Endereço do API Gateway (`API_GATEWAY_URL`), lido pelo CD dos serviços para montar as URLs da Lambda de e-mail e do aviso do Mercado Pago |
 | Parâmetros SSM de SMTP | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS` (config do provedor de e-mail) |
-| Security groups | Liberam a Lambda de auth no Postgres |
+| Security group | Usado pela Lambda de e-mail e pelo VPC Link |
 | Log groups + New Relic | Observabilidade das duas funções (ver seção abaixo) |
 
 ## Tecnologias
 
-TypeScript · Node.js 22 · `pg` · `jsonwebtoken` · `nodemailer` · `@aws-sdk/client-ssm` · esbuild · Terraform ≥ 1.10 · AWS Lambda · API Gateway HTTP v2 · GitHub Actions (OIDC)
+TypeScript · Node.js 22 · `jsonwebtoken` · `nodemailer` · `@aws-sdk/client-ssm` · esbuild · Terraform ≥ 1.10 · AWS Lambda · API Gateway HTTP v2 · GitHub Actions (OIDC)
 
 ## Dependências entre repositórios
 
-Depende de [`tc3-infra-k8s`](https://github.com/tiagostorch/tc3-infra-k8s) (rede/VPC, ALB, bootstrap OIDC) e de [`tc3-infra-db`](https://github.com/tiagostorch/tc3-infra-db) (banco, `DATABASE_URL` e o **prefixo do SSM**), lidos via `terraform_remote_state`. **Aplique os dois antes.**
+Depende de [`tc3-infra-k8s`](https://github.com/tiagostorch/tc3-infra-k8s) (rede/VPC, ALB, bootstrap OIDC) e de [`tc3-infra-db`](https://github.com/tiagostorch/tc3-infra-db) (o **prefixo do SSM**), lidos via `terraform_remote_state`. **Aplique os dois antes.**
 
-> **Pré-requisito de schema:** a coluna `status` em `Cliente` precisa existir (ajuste de modelagem desta fase, feito no repo [`tech-challenge-fiap`](https://github.com/LucasValada/tech-challenge-fiap)). Sem ela a consulta da Lambda de auth falha.
+> **Em runtime**, a autenticação depende do OS Service ([`tech-challenge-fiap`](https://github.com/LucasValada/tech-challenge-fiap)) no ar e do parâmetro `INTERNAL_API_TOKEN`, gerado pelo `terraform/` daquele repositório. Os dois são lidos na invocação, não no `apply`, então a ordem de aplicação não muda.
 
 ---
 
@@ -78,7 +78,9 @@ Depende de [`tc3-infra-k8s`](https://github.com/tiagostorch/tc3-infra-k8s) (rede
 
 O cliente da oficina autentica pelo CPF; a API do cluster protege as rotas sensíveis com o JWT emitido aqui.
 
-**Fluxo:** `POST /auth {cpf}` → valida os dígitos verificadores → consulta o cliente no RDS (existe? **ATIVO**?) → assina um **JWT HS256** com o segredo do SSM → devolve `{ token, cliente }`. A API no EKS valida esse token com o mesmo segredo, sem chamar a função.
+**Fluxo:** `POST /auth {cpf}` → valida os dígitos verificadores → busca o cliente no OS Service (`POST /internal/clientes/busca`, CPF no corpo e não na URL, header `x-internal-token`) → confere se existe e está **ATIVO** → assina um **JWT HS256** com o segredo do SSM → devolve `{ token, cliente }`. Os serviços no EKS validam esse token com o mesmo segredo, sem chamar a função.
+
+A chamada ao OS tem **timeout de 4 s e uma nova tentativa** quando a falha pode passar sozinha (timeout, erro de rede, 5xx). Um 4xx não é repetido: é token errado ou pedido inválido. O token é lido do SSM na primeira invocação e fica em cache na instância, só em caso de sucesso. O `x-correlation-id` vai junto, então o login aparece nos logs dos dois lados com o mesmo id.
 
 ```bash
 curl -X POST "$AUTH_URL" -H 'content-type: application/json' \
@@ -98,7 +100,7 @@ O token carrega `{ sub: <clienteId>, nome, tipo: "cliente" }`.
 | `400` | CPF ausente, malformado ou com dígito verificador inválido |
 | `404` | CPF válido, mas sem cliente correspondente |
 | `403` | Cliente encontrado, porém **inativo** |
-| `500` | Falha ao consultar o banco |
+| `500` | Falha ao consultar o cliente no OS Service (indisponível depois da nova tentativa, token recusado ou resposta fora do contrato) |
 
 ## Função 2 — Notificações por e-mail (`POST /mail`)
 
@@ -131,7 +133,7 @@ curl -X POST "$MAIL_URL" \
 
 ```bash
 npm ci
-npm test          # testes: validação de CPF, handler de e-mail e observabilidade
+npm test          # testes: validação de CPF, busca do cliente no OS, handler de e-mail e observabilidade
 npm run lint      # tsc --noEmit
 npm run package   # gera auth-lambda.zip e mail-lambda.zip (esbuild)
 ```
@@ -196,8 +198,8 @@ A ARN da layer muda por região e versão do agente e vai em `newrelic_layer_arn
 
 ## Decisões registradas
 
-- **`pg` em vez do Prisma na Lambda** — o engine do Prisma pesa dezenas de MB e encarece o cold start; a função de auth faz uma única consulta, o driver puro basta.
-- **Função de auth dentro da VPC** — obrigatório para alcançar um RDS não público; o custo é um cold start maior, aceitável para o volume.
+- **Cliente pela rota interna do OS, e não pelo banco** (Fase 4) — cada microsserviço tem banco próprio e nenhum outro componente o lê direto. A rota é `POST` para o CPF ir no corpo, e não na URL, que vai para os logs.
+- **Função de auth fora da VPC** — sem banco para alcançar, a VPC só acrescentaria cold start. A rota interna é chamada pelo endereço público do API Gateway, protegida pelo token do SSM.
 - **Segredo compartilhado (HS256)** — mais simples que JWKS para o escopo da fase; a API valida localmente, sem round-trip.
 - **SMTP na Lambda de e-mail, config no SSM** — isola o provedor de e-mail da aplicação; trocar Ethereal por SES não toca no código do app.
 - **Token interno na rota `/mail`** (`x-mail-api-token`, `timingSafeEqual`) — a rota não é pública; só a API com o token do SSM a chama.

@@ -138,3 +138,14 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_rate_limit    = 50
   }
 }
+
+# Endereço do API Gateway para os serviços da oficina: o OS e o Billing montam
+# com ele a URL da Lambda de e-mail e a do aviso do Mercado Pago. O endereço
+# muda quando a plataforma é recriada, então o CD de cada serviço o lê daqui em
+# vez de fixá-lo nos manifestos.
+resource "aws_ssm_parameter" "api_gateway_url" {
+  name        = "${local.ssm_prefix}/API_GATEWAY_URL"
+  description = "Endereço base do API Gateway da oficina"
+  type        = "String"
+  value       = aws_apigatewayv2_api.http.api_endpoint
+}
