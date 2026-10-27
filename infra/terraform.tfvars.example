@@ -4,11 +4,6 @@ state_bucket = "tc3-tfstate-oficina-SEUSUFIXO"
 
 jwt_expires_in = "1h"
 
-# Preencher com o listener do ALB criado pelo Ingress da aplicação para que o
-# Gateway roteie também as rotas protegidas:
-# alb_listener_arn = "arn:aws:elasticloadbalancing:us-east-1:...:listener/app/..."
-alb_listener_arn = ""
-
 # ─── Observabilidade ────────────────────────────────────────────────────────
 # A ARN da layer muda por região e a cada release do agente. A lista publicada
 # está em https://layers.newrelic-external.com — procurar NewRelicNodeJS22X.

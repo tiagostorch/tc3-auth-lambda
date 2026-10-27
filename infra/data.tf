@@ -20,11 +20,6 @@ data "terraform_remote_state" "db" {
 
 data "aws_caller_identity" "atual" {}
 
-# A senha do banco vive apenas no SSM; aqui só a referenciamos.
-data "aws_ssm_parameter" "database_url" {
-  name = data.terraform_remote_state.db.outputs.ssm_database_url_name
-}
-
 # Publicada por tc3-infra-k8s, que é quem recebe a chave como secret de CI.
 # `count` para o repositório continuar aplicável com a telemetria desligada,
 # antes de a conta do New Relic existir.
@@ -51,5 +46,4 @@ locals {
 
   vpc_id             = data.terraform_remote_state.k8s.outputs.vpc_id
   private_subnet_ids = data.terraform_remote_state.k8s.outputs.private_subnet_ids
-  db_security_group  = data.terraform_remote_state.db.outputs.db_security_group_id
 }

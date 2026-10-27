@@ -1,13 +1,13 @@
 /**
  * Autenticação por CPF do Tech Challenge Fase 3.
  *
- * Recebe um CPF, confirma que o cliente existe e está ativo no banco e devolve
- * um JWT aceito pela API da oficina — que valida o token com o mesmo segredo,
- * sem precisar consultar este serviço.
+ * Recebe um CPF, confirma no OS Service (dono do cadastro de clientes) que o
+ * cliente existe e está ativo e devolve um JWT aceito pelos serviços da oficina
+ * — que validam o token com o mesmo segredo, sem precisar consultar esta função.
  */
 
-import { Pool } from 'pg';
 import jwt, { type SignOptions } from 'jsonwebtoken';
+import { buscarCliente, type ClienteDoOs } from './cliente_os';
 import { cpfValido, formatarCpf, normalizarCpf } from './cpf';
 import {
   cabecalho,
@@ -35,34 +35,6 @@ interface Resposta {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
-}
-
-interface ClienteRow {
-  id: string;
-  nome: string;
-  status: string | null;
-}
-
-// Reaproveitado entre invocações na mesma instância: abrir conexão a cada
-// requisição esgota o limite de conexões do RDS sob carga.
-let pool: Pool | undefined;
-
-function obterPool(): Pool {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 2,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 5_000,
-
-      // O RDS recusa conexão sem TLS (rds.force_ssl), e o driver só negocia
-      // criptografia se pedirmos. Sem verificar o certificado: a CA do RDS não
-      // está no bundle padrão do Node, e o tráfego não sai da VPC.
-      ssl: { rejectUnauthorized: false },
-    });
-  }
-
-  return pool;
 }
 
 function responder(statusCode: number, corpo: unknown, correlationId: string): Resposta {
@@ -147,18 +119,13 @@ export async function handler(evento: EventoHttp, contexto: { awsRequestId: stri
     return responder(400, { mensagem: 'CPF inválido.' }, correlationId);
   }
 
-  let cliente: ClienteRow | undefined;
+  let cliente: ClienteDoOs | null;
 
   try {
-    const resultado = await obterPool().query<ClienteRow>(
-      'SELECT id, nome, status FROM "Cliente" WHERE "cpfCnpj" = $1 LIMIT 1',
-      [cpf],
-    );
-
-    cliente = resultado.rows[0];
+    cliente = await buscarCliente(cpf, correlationId);
   } catch (erro) {
-    log('error', 'Falha ao consultar o cliente', {
-      evento: 'integracao.banco.falha',
+    log('error', 'Falha ao consultar o cliente no OS Service', {
+      evento: 'integracao.os.falha',
       correlationId,
       erro: erro instanceof Error ? erro.message : String(erro),
     });

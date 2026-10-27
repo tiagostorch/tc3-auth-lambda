@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { criarMailHandler, memoizarSemFalha, type DependenciasMailHandler } from '../src/mail_handler.ts';
+import { criarMailHandler, type DependenciasMailHandler } from '../src/mail_handler.ts';
+import { memoizarSemFalha } from '../src/memoizar.ts';
 
 const configuracao = { host: 'smtp.example.com', port: 587, user: 'user', pass: 'pass', apiToken: 'segredo' };
 function handler(dependencias: Partial<DependenciasMailHandler> = {}) {
