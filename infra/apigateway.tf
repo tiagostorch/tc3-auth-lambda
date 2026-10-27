@@ -72,11 +72,34 @@ resource "aws_lambda_permission" "api_gateway_mail" {
 }
 
 # ─── Rotas protegidas da aplicação ──────────────────────────────────────────
-# Ativadas quando o Ingress da aplicação já criou o ALB e o listener foi
-# informado em `alb_listener_arn`.
+# Ativadas quando o ALB dos serviços já existe. Quem cria o ALB é o AWS Load
+# Balancer Controller, no primeiro deploy de um Ingress do grupo `oficina`, e o
+# endereço muda a cada vez que o ambiente é recriado. Por isso o ALB é achado
+# pelas tags que o controller grava nele. Antes do primeiro deploy, a busca
+# volta vazia e o Gateway expõe só /auth e /mail; o apply seguinte, depois dos
+# deploys, cria o VPC Link e a rota.
+
+data "aws_lbs" "aplicacao" {
+  tags = {
+    "elbv2.k8s.aws/cluster" = data.terraform_remote_state.k8s.outputs.cluster_name
+    "ingress.k8s.aws/stack" = "oficina"
+  }
+}
+
+# Os Ingresses não definem `listen-ports`, então o listener é o HTTP padrão.
+data "aws_lb_listener" "aplicacao" {
+  count = length(data.aws_lbs.aplicacao.arns) > 0 ? 1 : 0
+
+  load_balancer_arn = one(data.aws_lbs.aplicacao.arns)
+  port              = 80
+}
+
+locals {
+  alb_listener_arn = one(data.aws_lb_listener.aplicacao[*].arn)
+}
 
 resource "aws_apigatewayv2_vpc_link" "eks" {
-  count = var.alb_listener_arn != "" ? 1 : 0
+  count = local.alb_listener_arn != null ? 1 : 0
 
   name               = "${local.identificador}-vpclink"
   subnet_ids         = local.private_subnet_ids
@@ -84,18 +107,18 @@ resource "aws_apigatewayv2_vpc_link" "eks" {
 }
 
 resource "aws_apigatewayv2_integration" "aplicacao" {
-  count = var.alb_listener_arn != "" ? 1 : 0
+  count = local.alb_listener_arn != null ? 1 : 0
 
   api_id             = aws_apigatewayv2_api.http.id
   integration_type   = "HTTP_PROXY"
   integration_method = "ANY"
-  integration_uri    = var.alb_listener_arn
+  integration_uri    = local.alb_listener_arn
   connection_type    = "VPC_LINK"
   connection_id      = aws_apigatewayv2_vpc_link.eks[0].id
 }
 
 resource "aws_apigatewayv2_route" "aplicacao" {
-  count = var.alb_listener_arn != "" ? 1 : 0
+  count = local.alb_listener_arn != null ? 1 : 0
 
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "ANY /{proxy+}"

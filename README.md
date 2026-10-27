@@ -72,6 +72,8 @@ Depende de [`tc3-infra-k8s`](https://github.com/tiagostorch/tc3-infra-k8s) (rede
 
 > **Em runtime**, a autenticação depende do OS Service ([`tech-challenge-fiap`](https://github.com/LucasValada/tech-challenge-fiap)) no ar e do parâmetro `INTERNAL_API_TOKEN`, gerado pelo `terraform/` daquele repositório. Os dois são lidos na invocação, não no `apply`, então a ordem de aplicação não muda.
 
+> **Rota `ANY /{proxy+}`:** o ALB dos serviços é criado pelo AWS Load Balancer Controller no primeiro deploy de um Ingress do grupo `oficina`, e o Terraform o encontra pelas tags (`elbv2.k8s.aws/cluster` e `ingress.k8s.aws/stack`). Num ambiente novo, o primeiro `apply` sobe só `/auth` e `/mail` e publica o `API_GATEWAY_URL`, que os deploys dos serviços leem; depois dos deploys, um segundo `apply` cria o VPC Link e a rota. Não há ARN para copiar.
+
 ---
 
 ## Função 1 — Autenticação por CPF (`POST /auth`)

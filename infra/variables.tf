@@ -63,16 +63,6 @@ variable "lambda_timeout_seconds" {
   default = 15
 }
 
-variable "alb_listener_arn" {
-  description = <<-EOT
-    Listener do ALB criado pelo Ingress da aplicação no EKS. Enquanto vazio, o
-    Gateway expõe apenas a rota de autenticação; preenchido, passa a rotear
-    também as rotas protegidas via VPC Link.
-  EOT
-  type        = string
-  default     = ""
-}
-
 # ─── Observabilidade ────────────────────────────────────────────────────────
 
 variable "newrelic_enabled" {
