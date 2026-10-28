@@ -119,10 +119,25 @@ curl -X POST "$MAIL_URL" \
 { "message": "Email enviado com sucesso." }
 ```
 
+Dois campos opcionais permitem um e-mail com imagem — o Billing manda assim o QR Code de pagamento:
+
+- `html`: versão em HTML do e-mail; o `text` continua obrigatório, para clientes de e-mail que só mostram texto.
+- `attachments`: até 3 imagens (`image/png` ou `image/jpeg`), cada uma com `filename`, `contentType`, `content` em base64 (até 512 KB) e, opcionalmente, `cid`. Com `cid`, a imagem aparece no corpo pelo `<img src="cid:...">` do `html`.
+
+```json
+{
+  "to": "cliente@exemplo.com",
+  "subject": "Pagamento da OS OS-2026-000001",
+  "text": "...",
+  "html": "<p>...</p><img src=\"cid:qrcode-pagamento\" alt=\"QR Code de pagamento\">",
+  "attachments": [{ "filename": "qrcode.png", "contentType": "image/png", "content": "<base64>", "cid": "qrcode-pagamento" }]
+}
+```
+
 | Status | Situação |
 |---|---|
 | `200` | E-mail enviado |
-| `400` | Corpo inválido — `to`, `subject` e `text` são obrigatórios |
+| `400` | Corpo inválido — `to`, `subject` e `text` são obrigatórios; `html` vazio ou `attachments` fora do formato acima |
 | `401` | `x-mail-api-token` ausente ou incorreto |
 | `405` | Método diferente de `POST` |
 | `500` | Falha ao ler a config no SSM ou ao enviar via SMTP |
