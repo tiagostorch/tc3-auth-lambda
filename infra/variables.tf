@@ -107,7 +107,7 @@ variable "newrelic_account_id" {
 variable "newrelic_tags" {
   description = <<-EOT
     Tags padrão do projeto em toda telemetria da função (logs e invocações).
-    Os mesmos valores de `newrelic_tags` em tc3-infra-k8s e tc3-infra-db e de
+    Os mesmos valores de `newrelic_tags` em tc3-infra-k8s e no terraform/ do OS e de
     NEW_RELIC_LABELS no ConfigMap da aplicação — é por elas que os alertas e
     dashboards filtram. Separadas de `environment`, que compõe nomes de recurso.
   EOT

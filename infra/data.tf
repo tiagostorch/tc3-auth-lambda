@@ -8,16 +8,6 @@ data "terraform_remote_state" "k8s" {
   }
 }
 
-data "terraform_remote_state" "db" {
-  backend = "s3"
-
-  config = {
-    bucket = var.state_bucket
-    key    = "infra-db/terraform.tfstate"
-    region = var.aws_region
-  }
-}
-
 data "aws_caller_identity" "atual" {}
 
 # Publicada por tc3-infra-k8s, que é quem recebe a chave como secret de CI.
@@ -39,7 +29,8 @@ data "aws_ssm_parameter" "newrelic_license_key" {
 locals {
   identificador      = "${var.project_name}-${var.environment}-auth"
   mail_identificador = "${var.project_name}-${var.environment}-mail"
-  ssm_prefix         = data.terraform_remote_state.db.outputs.ssm_prefix
+  # Prefixo dos parâmetros do projeto no SSM, o mesmo em todas as stacks.
+  ssm_prefix = "/${var.project_name}/${var.environment}"
 
   # Tags padrão no formato de NEW_RELIC_LABELS, idêntico ao da API no cluster.
   newrelic_labels = join(";", [for chave, valor in var.newrelic_tags : "${chave}:${valor}"])

@@ -15,7 +15,7 @@ newrelic_region    = "US"
 # NEW_RELIC_ACCOUNT_ID no CI, .env na raiz localmente), não neste arquivo.
 # A license key não é lida por este repositório: a extension a busca no SSM.
 
-# Tags padrão em toda telemetria — iguais às de tc3-infra-k8s e tc3-infra-db.
+# Tags padrão em toda telemetria — iguais às de tc3-infra-k8s e do terraform/ do OS.
 newrelic_tags = {
   environment = "production"
   project     = "tech-challenge-fiap"

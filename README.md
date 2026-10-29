@@ -68,7 +68,7 @@ TypeScript · Node.js 22 · `jsonwebtoken` · `nodemailer` · `@aws-sdk/client-s
 
 ## Dependências entre repositórios
 
-Depende de [`tc3-infra-k8s`](https://github.com/tiagostorch/tc3-infra-k8s) (rede/VPC, ALB, bootstrap OIDC) e de [`tc3-infra-db`](https://github.com/tiagostorch/tc3-infra-db) (o **prefixo do SSM**), lidos via `terraform_remote_state`. **Aplique os dois antes.**
+Depende de [`tc3-infra-k8s`](https://github.com/tiagostorch/tc3-infra-k8s) (rede/VPC, cluster, bootstrap OIDC), lido via `terraform_remote_state`. **Aplique-o antes.** O prefixo do SSM (`/tc3-oficina/homolog`) é montado aqui a partir de `project_name` e `environment`, os mesmos valores das outras stacks.
 
 > **Em runtime**, a autenticação depende do OS Service ([`tech-challenge-fiap`](https://github.com/LucasValada/tech-challenge-fiap)) no ar e do parâmetro `INTERNAL_API_TOKEN`, gerado pelo `terraform/` daquele repositório. Os dois são lidos na invocação, não no `apply`, então a ordem de aplicação não muda.
 
